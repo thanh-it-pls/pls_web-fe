@@ -20,7 +20,7 @@ const Slide = ({ card, active }: { card: CardTree; active: boolean }): React.JSX
 );
 
 /** Slider of card images: current slide centered and editable, neighbours dimmed. */
-export const GalleryBlock = ({ section }: BlockProps): React.JSX.Element => {
+export const AboutGalleryBlock = ({ section }: BlockProps): React.JSX.Element => {
   const cards = section.cards;
   const { index, prev, next, go } = useSlider(cards.length);
   const at = (i: number): CardTree | undefined => (cards.length > 1 ? cards[(i + cards.length) % cards.length] : undefined);

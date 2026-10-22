@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 
 export interface BlockProps {
   section: SectionTree;
+  /** True when a shared background wraps this section: the block must not paint its own. */
+  bare?: boolean;
 }
 
 /** Centered content column shared by all blocks. */

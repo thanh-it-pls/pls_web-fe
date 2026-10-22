@@ -2,7 +2,7 @@ import { Container, SectionHeading, type BlockProps } from "@/components/site/bl
 import { EditableImage, EditableText, ItemControls } from "@/components/site/editor";
 
 /** White cards: card.img = icon, title (red), des. */
-export const GoalsBlock = ({ section }: BlockProps): React.JSX.Element => (
+export const AboutGoalsBlock = ({ section }: BlockProps): React.JSX.Element => (
   <section className="py-14">
     <Container>
       <SectionHeading section={section} />

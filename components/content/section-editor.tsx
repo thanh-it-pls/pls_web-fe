@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Plus } from "lucide-react";
 
+import { BackgroundSelect } from "@/components/content/background-picker";
 import { CardItem } from "@/components/content/card-item";
 import { CardDialog } from "@/components/content/entity-dialogs";
 import { Field } from "@/components/crm/field";
@@ -25,8 +26,6 @@ const SectionForm = ({ section }: { section: Section }): React.JSX.Element => {
   const [title, setTitle] = useState(section.title ?? "");
   const [des, setDes] = useState(section.des ?? "");
   const [background, setBackground] = useState(section.background ?? "");
-  const isBackground = section.type === SectionType.BACKGROUND;
-
   return (
     <div className="mb-8 grid gap-4 rounded-lg border bg-card p-5">
       <div className="flex items-center justify-between">
@@ -39,18 +38,16 @@ const SectionForm = ({ section }: { section: Section }): React.JSX.Element => {
       <Field label="Mô tả">
         <Textarea value={des} onChange={(e) => setDes(e.target.value)} />
       </Field>
-      {isBackground && (
-        <Field label="Ảnh nền (URL)">
-          <Input value={background} onChange={(e) => setBackground(e.target.value)} placeholder="https://…" />
-        </Field>
-      )}
+      <Field label="Nền" hint="Các section liền nhau chọn cùng một nền sẽ dùng chung nền đó. Thêm nền ở Tổng quan.">
+        <BackgroundSelect value={background} onChange={setBackground} />
+      </Field>
       <div className="flex justify-end">
         <Button
           disabled={update.isPending}
           onClick={() =>
             update.mutate({
               id: section.id,
-              body: { title: nullable(title), des: nullable(des), ...(isBackground && { background: nullable(background) }) },
+              body: { title: nullable(title), des: nullable(des), background: nullable(background) },
             })
           }
         >

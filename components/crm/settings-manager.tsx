@@ -25,6 +25,7 @@ import {
   type SettingTypeValue,
 } from "@/lib/api/types";
 import { nullable } from "@/lib/utils";
+import { colorOf } from "@/lib/site/background";
 
 const DOMAIN = { domain: "setting-shows" };
 
@@ -34,6 +35,8 @@ const TYPE_HINT: Record<SettingTypeValue, { link: string; img: string; title: st
   3: { title: "Tên logo", link: "Liên kết khi bấm logo", img: "Ảnh logo (URL)" },
   4: { title: "Nhãn liên hệ", link: "Giá trị / liên kết (tel:, mailto:…)", img: "Icon (URL)" },
   5: { title: "Nội dung nút", link: "Đường dẫn khi bấm", img: "Icon (URL)" },
+  6: { title: "Tên nền (để chọn ở section)", link: "Liên kết (tuỳ chọn)", img: "Ảnh nền (URL)" },
+  7: { title: "Tên màu (để chọn ở section)", link: "Liên kết (tuỳ chọn)", img: "" },
 };
 
 const TYPES = Object.values(SettingType) as SettingTypeValue[];
@@ -41,12 +44,22 @@ const TYPES = Object.values(SettingType) as SettingTypeValue[];
 interface FormState {
   title: string;
   link: string;
+  color: string;
   img: string;
   position: SettingPosition;
   code: string;
 }
 
-const emptyForm = (): FormState => ({ title: "", link: "", img: "", position: "HEADER", code: "" });
+const isBackgroundType = (type: SettingTypeValue): boolean => type === SettingType.BACKGROUND || type === SettingType.COLOR;
+
+const emptyForm = (type: SettingTypeValue): FormState => ({
+  title: "",
+  link: "",
+  img: "",
+  position: isBackgroundType(type) ? "SECTION" : "HEADER",
+  code: "",
+  color: "",
+});
 
 const SettingDialog = ({
   type,
@@ -61,14 +74,14 @@ const SettingDialog = ({
 }): React.JSX.Element => {
   const { create, update } = useResourceMutations(settingShowsApi, DOMAIN);
   const [form, setForm] = useState<FormState>(
-    item ? { title: item.title, link: item.link ?? "", img: item.img ?? "", position: item.position, code: item.code } : emptyForm(),
+    item ? { title: item.title, link: item.link ?? "", img: item.img ?? "", position: item.position, code: item.code, color: item.color ?? "" } : emptyForm(type),
   );
   const hint = TYPE_HINT[type];
   const set = (patch: Partial<FormState>): void => setForm((f) => ({ ...f, ...patch }));
   const pending = create.isPending || update.isPending;
 
   const submit = (): void => {
-    const body = { title: form.title, link: nullable(form.link), img: nullable(form.img), position: form.position, code: form.code.trim() };
+    const body = { title: form.title, link: nullable(form.link), img: nullable(form.img), position: form.position, code: form.code.trim(), ...(type === SettingType.COLOR || item?.color ? { color: nullable(form.color) } : {}) };
     const done = { onSuccess: () => onOpenChange(false) };
     if (item) update.mutate({ id: item.id, body }, done);
     else create.mutate({ ...body, type }, done);
@@ -89,7 +102,9 @@ const SettingDialog = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(POSITION_LABEL) as SettingPosition[]).map((p) => (
+                {(Object.keys(POSITION_LABEL) as SettingPosition[])
+                  .filter((p) => (p === "SECTION") === isBackgroundType(type))
+                  .map((p) => (
                   <SelectItem key={p} value={p}>
                     {POSITION_LABEL[p]}
                   </SelectItem>
@@ -103,13 +118,28 @@ const SettingDialog = ({
           <Field label="Code" required hint="Dùng để website nhận diện mục này.">
             <Input value={form.code} onChange={(e) => set({ code: e.target.value })} placeholder="vd: logo-main" />
           </Field>
+          {type === SettingType.COLOR && (
+            <Field label="Mã màu (hex)" required>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={/^#[0-9a-f]{6}$/i.test(form.color) ? form.color : "#ffffff"}
+                  onChange={(e) => set({ color: e.target.value })}
+                  className="h-9 w-12 shrink-0 cursor-pointer rounded-md border bg-card p-1"
+                />
+                <Input value={form.color} onChange={(e) => set({ color: e.target.value })} placeholder="#fdeeee" />
+              </div>
+            </Field>
+          )}
           <Field label={hint.link}>
             <Input value={form.link} onChange={(e) => set({ link: e.target.value })} />
           </Field>
-          <Field label={hint.img}>
-            <Input value={form.img} onChange={(e) => set({ img: e.target.value })} placeholder="https://…" />
-          </Field>
-          {form.img && type === SettingType.LOGO && (
+          {type !== SettingType.COLOR && (
+            <Field label={hint.img}>
+              <Input value={form.img} onChange={(e) => set({ img: e.target.value })} placeholder="https://…" />
+            </Field>
+          )}
+          {form.img && (type === SettingType.LOGO || type === SettingType.BACKGROUND) && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={form.img} alt="Xem trước logo" className="h-16 w-auto rounded border bg-muted object-contain p-2" />
           )}
@@ -118,7 +148,7 @@ const SettingDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Huỷ
           </Button>
-          <Button disabled={!form.title.trim() || !form.code.trim() || pending} onClick={submit}>
+          <Button disabled={!form.title.trim() || !form.code.trim() || (type === SettingType.COLOR && !form.color.trim()) || pending} onClick={submit}>
             Lưu
           </Button>
         </DialogFooter>
@@ -141,11 +171,11 @@ const SettingRow = ({
       // eslint-disable-next-line @next/next/no-img-element
       <img src={item.img} alt="" className="size-10 rounded border bg-muted object-contain" />
     ) : (
-      <div className="size-10 rounded border bg-muted" />
+      <div className="size-10 rounded border bg-muted" style={{ background: colorOf(item) ?? undefined }} />
     )}
     <div className="min-w-0 flex-1">
       <p className="truncate text-sm font-medium">{item.title}</p>
-      <p className="truncate text-xs text-muted-foreground">{item.link ?? "—"}</p>
+      <p className="truncate text-xs text-muted-foreground">{item.color ?? item.link ?? "—"}</p>
     </div>
     <Badge variant="secondary">{POSITION_LABEL[item.position]}</Badge>
     <Button variant="ghost" size="icon-sm" onClick={onEdit} aria-label="Sửa">
@@ -204,7 +234,7 @@ const SettingTab = ({ type }: { type: SettingTypeValue }): React.JSX.Element => 
 export const SettingsManager = (): React.JSX.Element => (
   <Tabs defaultValue={String(SettingType.LOGO)} className="grid gap-4">
     <TabsList className="h-auto flex-wrap">
-      {[SettingType.LOGO, SettingType.SOCIAL, SettingType.VERSION, SettingType.FOOTER_CONTACT, SettingType.BUTTON].map(
+      {[SettingType.LOGO, SettingType.SOCIAL, SettingType.VERSION, SettingType.FOOTER_CONTACT, SettingType.BUTTON, SettingType.BACKGROUND, SettingType.COLOR].map(
         (t) => (
           <TabsTrigger key={t} value={String(t)} className="h-8">
             {SETTING_TYPE_LABEL[t]}

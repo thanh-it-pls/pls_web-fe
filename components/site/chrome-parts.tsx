@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { Field } from "@/components/crm/field";
-import { ItemControls, useEditor } from "@/components/site/editor";
+import { ItemControls, useEditor, type Entity } from "@/components/site/editor";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -26,32 +26,63 @@ export const SocialIcon = ({ item }: { item: SettingShow }): React.JSX.Element =
   </a>
 );
 
-export const AddButton = ({ label, onClick }: { label: string; onClick: () => void }): React.JSX.Element => (
+/** Always-visible "+ add" chip: sky outline on a light chip, readable on both light and dark backgrounds. */
+export const AddButton = ({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}): React.JSX.Element => (
   <button
     type="button"
+    disabled={disabled}
     onClick={onClick}
-    className="inline-flex cursor-pointer items-center gap-0.5 rounded border border-dashed border-white/40 px-1.5 py-0.5 text-[10px] text-white/80 hover:border-sky-400 hover:text-sky-300"
+    className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-sky-500 bg-white/95 px-2 py-1 text-xs font-medium whitespace-nowrap text-sky-700 shadow-sm hover:bg-sky-50 disabled:cursor-wait disabled:opacity-60"
   >
-    <Plus className="size-3" /> {label}
+    <Plus className="size-3.5" /> {label}
   </button>
 );
 
-/** Edit dialog for a social icon: name, link and icon image. */
-const SocialDialog = ({ item, onClose }: { item: SettingShow; onClose: () => void }): React.JSX.Element => {
+interface SocialLike {
+  id: string;
+  title: string;
+  link: string | null;
+  img: string | null;
+  color?: string | null;
+}
+
+/** Edit dialog for a social icon: name, link, icon image and (optionally) colour. */
+export const SocialDialog = ({
+  item,
+  entity = "setting-shows",
+  withColor = false,
+  onClose,
+}: {
+  item: SocialLike;
+  entity?: Entity;
+  withColor?: boolean;
+  onClose: () => void;
+}): React.JSX.Element => {
   const editor = useEditor();
   const [title, setTitle] = useState(item.title);
   const [link, setLink] = useState(item.link ?? "");
   const [img, setImg] = useState(item.img ?? "");
+  const [color, setColor] = useState(item.color ?? "");
   const [saving, setSaving] = useState(false);
 
   const submit = async (): Promise<void> => {
     if (!editor) return;
     setSaving(true);
-    const ok = await editor.save("setting-shows", item.id, {
+    const patch: Record<string, string | null> = {
       title: title.trim(),
       link: link.trim() || null,
       img: img.trim() || null,
-    });
+    };
+    if (withColor && (color.trim() || item.color)) patch.color = color.trim() || null;
+    const ok = await editor.save(entity, item.id, patch);
     setSaving(false);
     if (ok) onClose();
   };
@@ -72,6 +103,11 @@ const SocialDialog = ({ item, onClose }: { item: SettingShow; onClose: () => voi
           <Field label="Icon (URL ảnh)">
             <Input value={img} onChange={(e) => setImg(e.target.value)} placeholder="https://…" />
           </Field>
+          {withColor && (
+            <Field label="Màu nền (hex)" hint="Để trống để dùng màu mặc định theo tên.">
+              <Input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#1877f2" />
+            </Field>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

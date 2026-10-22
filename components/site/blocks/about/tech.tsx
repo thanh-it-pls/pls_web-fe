@@ -1,12 +1,13 @@
 "use client";
 
+import { AddContents } from "@/components/site/add-content";
 import { Container, EmptyBlock, SectionHeading, type BlockProps } from "@/components/site/blocks/common";
 import { SliderArrow, SliderDots, useSlider } from "@/components/site/carousel";
 import { EditableButton, EditableImage, EditableText, ItemControls } from "@/components/site/editor";
 import { ContentType } from "@/lib/api/types";
 
 /** Slider of cards: img = screenshot, title = product, subtitle = tagline, des = text, BUTTON content = CTA. */
-export const TechBlock = ({ section }: BlockProps): React.JSX.Element => {
+export const AboutTechBlock = ({ section }: BlockProps): React.JSX.Element => {
   const cards = section.cards;
   const { index, prev, next, go } = useSlider(cards.length);
   const card = cards[index];
@@ -30,6 +31,7 @@ export const TechBlock = ({ section }: BlockProps): React.JSX.Element => {
                   <EditableText as="p" entity="cards" id={card.id} field="des" value={card.des} multiline placeholder="Mô tả" className="mt-3 block text-xs leading-relaxed text-neutral-700" />
                   <div className="mt-4">
                     <EditableButton content={button} className="inline-block rounded-full border border-[#c0272d] px-5 py-1.5 text-xs font-semibold text-[#c0272d]" />
+                    {!button && <AddContents cardId={card.id} items={[{ type: 4, label: "Nút" }]} />}
                   </div>
                 </div>
               </ItemControls>

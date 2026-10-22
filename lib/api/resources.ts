@@ -69,6 +69,7 @@ export interface ContentInput {
   subtitle?: string | null;
   des?: string | null;
   icon?: string | null;
+  color?: string | null;
   status?: StatusValue;
 }
 
@@ -79,6 +80,7 @@ export interface SettingShowInput {
   position: string;
   link?: string | null;
   img?: string | null;
+  color?: string | null;
 }
 
 export const pageHeadersApi = createResource<PageHeader, PageHeaderInput>("/page-headers");
@@ -106,3 +108,19 @@ export interface FooterItemInput {
 
 export const footerSectionsApi = createResource<FooterSection, FooterSectionInput>("/footer-sections");
 export const footerItemsApi = createResource<FooterItem, FooterItemInput>("/footer-items");
+
+export interface SectionBackgroundInput {
+  /** 6 = BACKGROUND (image, needs `img`), 7 = COLOR (needs `color`). */
+  type: 6 | 7;
+  section_ids: string[];
+  img?: string;
+  color?: string;
+  title?: string;
+  code?: string;
+}
+
+/** POST /sections/background: create one SECTION setting-show and attach it to adjacent sections. */
+export const createSectionBackground = async (
+  body: SectionBackgroundInput,
+): Promise<{ setting_show: SettingShow; sections: Section[] }> =>
+  (await api<ItemResponse<{ setting_show: SettingShow; sections: Section[] }>>("/sections/background", { method: "POST", body })).data;

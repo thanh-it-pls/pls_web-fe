@@ -14,13 +14,13 @@ const TILES = [
 ];
 
 /** One card: subtitle = kicker, title = quote, des = text. ITEM contents: title = label, subtitle = value, img = icon. */
-export const StatsBlock = ({ section }: BlockProps): React.JSX.Element => {
+export const AboutStatsBlock = ({ section, bare }: BlockProps): React.JSX.Element => {
   const card = section.cards[0];
   if (!card) return <EmptyBlock label="Chưa có card." />;
   const items = card.contents.filter((c) => c.type === ContentType.ITEM);
 
   return (
-    <section className="bg-[#fdeeee] py-14">
+    <section className={cn("py-14", !bare && "bg-[#fdeeee]")}>
       <Container className="grid items-center gap-10 @3xl:grid-cols-2">
         <div>
           <EditableText as="p" entity="cards" id={card.id} field="subtitle" value={card.subtitle} placeholder="Dòng nhỏ" className="block text-lg font-extrabold text-neutral-600 uppercase" />

@@ -119,12 +119,15 @@ export const ContentDialog = ({
   const { create, update } = useResourceMutations(contentsApi, { domain: "contents" });
   const [form, setForm] = useState<CommonFields>(toCommon(item));
   const [icon, setIcon] = useState(item?.icon ?? "");
+  const [color, setColor] = useState(item?.color ?? "");
   const [type, setType] = useState<ContentTypeValue>(item?.type ?? 3);
   const set = (patch: Partial<CommonFields>): void => setForm((f) => ({ ...f, ...patch }));
   const pending = create.isPending || update.isPending;
 
   const submit = (): void => {
-    const body = { ...payload(form), type, icon: nullable(icon) };
+    // `color` is only sent when used, so the dialog keeps working while the API lacks that field.
+    const colorPatch = color.trim() ? { color: color.trim() } : item?.color ? { color: null } : {};
+    const body = { ...payload(form), type, icon: nullable(icon), ...colorPatch };
     const done = { onSuccess: onClose };
     if (item) update.mutate({ id: item.id, body }, done);
     else create.mutate({ ...body, parent: cardId, code: genCode("content") }, done);
@@ -154,6 +157,9 @@ export const ContentDialog = ({
           <CommonInputs form={form} set={set} />
           <Field label="Icon">
             <Input value={icon} onChange={(e) => setIcon(e.target.value)} />
+          </Field>
+          <Field label="Màu (hex)" hint="Màu bullet / icon mạng xã hội, ví dụ #2e9e5b">
+            <Input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#2e9e5b" />
           </Field>
         </div>
         <DialogFooter>

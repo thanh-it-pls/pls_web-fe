@@ -27,7 +27,7 @@ const SitePage = async ({ params }: { params: Promise<{ slug?: string[] }> }): P
   return (
     <div className="@container min-h-screen bg-white text-neutral-900">
       <SiteHeader chrome={chrome} activePageId={page.id} />
-      <SiteSections sections={sections} />
+      <SiteSections sections={sections} settings={chrome.settings} />
       <SiteFooter chrome={chrome} />
     </div>
   );

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const SHADES = ["bg-[#e8736f]", "bg-[#d9524f]", "bg-[#c9302c]", "bg-[#b52320]"];
 
 /** Cards on red tiles that darken left → right. card.img = illustration. */
-export const ValuesBlock = ({ section }: BlockProps): React.JSX.Element => (
+export const AboutValuesBlock = ({ section }: BlockProps): React.JSX.Element => (
   <section className="py-14">
     <Container>
       <SectionHeading section={section} />

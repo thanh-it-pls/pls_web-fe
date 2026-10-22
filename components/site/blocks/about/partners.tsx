@@ -28,14 +28,14 @@ const Logo = ({ content }: { content: Content }): React.JSX.Element => (
 );
 
 /** One card whose IMAGE contents are logos. Scrolls as a marquee on the public site, static wrap while editing. */
-export const PartnersBlock = ({ section }: BlockProps): React.JSX.Element => {
+export const AboutPartnersBlock = ({ section, bare }: BlockProps): React.JSX.Element => {
   const editor = useEditor();
   const logos = (section.cards[0]?.contents ?? []).filter((c) => c.type === ContentType.IMAGE);
   if (logos.length === 0 && !editor) return <></>;
   if (logos.length === 0) return <EmptyBlock label="Chưa có logo — dùng nút “Thêm logo”." />;
 
   return (
-    <section className="overflow-hidden border-y bg-white py-4">
+    <section className={cn("overflow-hidden border-y py-4", !bare && "bg-white")}>
       <div className={cn("flex items-center gap-10", editor ? "flex-wrap justify-center px-6" : "w-max animate-marquee")}>
         {logos.map((l) => (
           <Logo key={l.id} content={l} />

@@ -15,13 +15,14 @@ export const ContentType = {
   RATING: 6,
   REVIEW: 7,
   DOWNLOAD: 8,
+  SOCIAL: 9,
 } as const;
 export type ContentTypeValue = (typeof ContentType)[keyof typeof ContentType];
 
-export const SettingType = { SOCIAL: 1, VERSION: 2, LOGO: 3, FOOTER_CONTACT: 4, BUTTON: 5 } as const;
+export const SettingType = { SOCIAL: 1, VERSION: 2, LOGO: 3, FOOTER_CONTACT: 4, BUTTON: 5, BACKGROUND: 6, COLOR: 7 } as const;
 export type SettingTypeValue = (typeof SettingType)[keyof typeof SettingType];
 
-export type SettingPosition = "HEADER" | "FOOTER";
+export type SettingPosition = "HEADER" | "FOOTER" | "SECTION";
 
 export const SECTION_TYPE_LABEL: Record<SectionTypeValue, string> = {
   1: "Background",
@@ -37,6 +38,7 @@ export const CONTENT_TYPE_LABEL: Record<ContentTypeValue, string> = {
   6: "Đánh giá sao",
   7: "Review",
   8: "Tải xuống",
+  9: "Mạng xã hội",
 };
 
 export const SETTING_TYPE_LABEL: Record<SettingTypeValue, string> = {
@@ -45,11 +47,14 @@ export const SETTING_TYPE_LABEL: Record<SettingTypeValue, string> = {
   3: "Logo",
   4: "Liên hệ footer",
   5: "Nút bấm",
+  6: "Nền (ảnh)",
+  7: "Màu nền",
 };
 
 export const POSITION_LABEL: Record<SettingPosition, string> = {
   HEADER: "Header",
   FOOTER: "Footer",
+  SECTION: "Section",
 };
 
 interface Orderable {
@@ -74,6 +79,8 @@ export interface Content extends Orderable {
   status: StatusValue;
   code: string;
   icon: string | null;
+  /** Bullet / icon colour (hex). Optional until the API returns it. */
+  color?: string | null;
 }
 
 export interface Card extends Orderable {
@@ -104,6 +111,8 @@ export interface SettingShow extends Orderable {
   type: SettingTypeValue;
   code: string;
   position: SettingPosition;
+  /** Colour (hex) for COLOR settings. */
+  color?: string | null;
 }
 
 export interface OffsetMeta {

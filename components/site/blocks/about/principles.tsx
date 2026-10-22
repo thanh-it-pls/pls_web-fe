@@ -18,7 +18,7 @@ const Item = ({ item, n, side }: { item: Content; n: number; side: "left" | "rig
 );
 
 /** One card (img = centre logo) with ITEM contents numbered 01…; odd numbers left, even right. */
-export const PrinciplesBlock = ({ section }: BlockProps): React.JSX.Element => {
+export const AboutPrinciplesBlock = ({ section }: BlockProps): React.JSX.Element => {
   const card = section.cards[0];
   const items = (card?.contents ?? []).filter((c) => c.type === ContentType.ITEM);
   return (

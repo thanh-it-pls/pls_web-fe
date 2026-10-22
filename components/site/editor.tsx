@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ImageIcon, Link2, Trash2 } from "lucide-react";
 
 import { ConfirmDelete } from "@/components/crm/confirm-delete";
@@ -9,16 +9,29 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Content } from "@/lib/api/types";
+import { hasRich, sanitizeRich, serializeRich, toPlain } from "@/lib/site/rich";
 import { cn } from "@/lib/utils";
 
 export type Entity = "sections" | "cards" | "contents" | "setting-shows" | "footer-sections" | "footer-items";
 export type RemovableEntity = Exclude<Entity, "sections">;
 
-/** Things the header / footer let you create in place. */
+/** Content types that can be added in place from a block. */
+export type ContentAddType = 1 | 3 | 4 | 5 | 6 | 8 | 9;
+
+/** Things the header / footer / blocks let you create in place. */
 export type SiteAdd =
   | { kind: "logo" | "copyright" | "social" | "contact" | "header-logo" | "header-button" | "header-social" }
   | { kind: "group"; groupType: 1 | 2 }
-  | { kind: "item"; groupId: string; itemType: 1 | 2 | 3 | 4 | 5 };
+  | { kind: "item"; groupId: string; itemType: 1 | 2 | 3 | 4 | 5 }
+  | {
+      kind: "content";
+      cardId: string;
+      contentType: ContentAddType;
+      /** Optional overrides of the default title / subtitle / link of the new content. */
+      title?: string;
+      subtitle?: string;
+      link?: string | null;
+    };
 
 /** Provided by the CRM canvas. When absent (public site) every editable renders as plain content. */
 export interface EditorApi {
@@ -48,7 +61,30 @@ interface EditableTextProps {
   className?: string;
 }
 
-/** Text that is click-to-edit inside the CRM canvas and plain text on the public site. */
+const RICH_ENTITIES: Entity[] = ["sections", "cards", "contents"];
+
+/** Renders a stored string: plain text, or (when it has colour spans) sanitized inline-coloured HTML. */
+export const RichText = ({
+  value,
+  as: Tag = "span",
+  className,
+}: {
+  value: string | null | undefined;
+  as?: React.ElementType;
+  className?: string;
+}): React.JSX.Element | null => {
+  if (!value) return null;
+  return hasRich(value) ? (
+    <Tag className={className} dangerouslySetInnerHTML={{ __html: sanitizeRich(value) }} />
+  ) : (
+    <Tag className={className}>{value}</Tag>
+  );
+};
+
+/**
+ * Text that is click-to-edit inside the CRM canvas and plain text on the public site.
+ * Section / card / content texts also support inline colours (see lib/site/rich.ts).
+ */
 export const EditableText = ({
   entity,
   id,
@@ -62,46 +98,63 @@ export const EditableText = ({
 }: EditableTextProps): React.JSX.Element | null => {
   const editor = useEditor();
   if (!editor) {
-    return value ? <Tag className={cn(multiline && "whitespace-pre-line", className)}>{value}</Tag> : null;
+    return <RichText value={value} as={Tag} className={cn(multiline && "whitespace-pre-line", className)} />;
   }
 
+  const rich = RICH_ENTITIES.includes(entity);
+  const restore = (el: HTMLElement): void => {
+    if (rich) el.innerHTML = sanitizeRich(value ?? "");
+    else el.innerText = value ?? "";
+  };
+
   const commit = async (el: HTMLElement): Promise<void> => {
-    const text = el.innerText.replace(/ /g, " ").trim();
+    const text = rich ? serializeRich(el) : el.innerText.replace(/\u00a0/g, " ").trim();
     if (text === (value ?? "")) return;
     if (text === "" && required) {
-      el.innerText = value ?? "";
+      restore(el);
       return;
     }
     const ok = await editor.save(entity, id, { [field]: text === "" ? null : text });
-    if (!ok) el.innerText = value ?? "";
+    if (!ok) restore(el);
   };
 
   return (
     <Tag
       // Remount on external value change so React never diffs against DOM the browser edited.
       key={value ?? ""}
-      contentEditable="plaintext-only"
+      contentEditable={rich ? true : "plaintext-only"}
       suppressContentEditableWarning
       spellCheck={false}
       data-placeholder={placeholder}
+      data-rich={rich ? "" : undefined}
       className={cn(
         "cursor-text rounded-sm outline-1 outline-offset-2 outline-transparent transition-[outline-color] hover:outline-dashed hover:outline-sky-400 focus:outline-2 focus:outline-solid focus:outline-sky-500 empty:before:opacity-50 empty:before:content-[attr(data-placeholder)]",
         multiline && "whitespace-pre-line",
         className,
       )}
       onBlur={(e: React.FocusEvent<HTMLElement>) => void commit(e.currentTarget)}
+      onPaste={
+        rich
+          ? (e: React.ClipboardEvent<HTMLElement>) => {
+              // Paste as plain text so foreign formatting never leaks in.
+              e.preventDefault();
+              document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+            }
+          : undefined
+      }
       onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
         if (e.key === "Escape") {
-          e.currentTarget.innerText = value ?? "";
+          restore(e.currentTarget);
           e.currentTarget.blur();
         } else if (e.key === "Enter" && !multiline) {
           e.preventDefault();
           e.currentTarget.blur();
         }
       }}
-    >
-      {value ?? ""}
-    </Tag>
+      {...(rich
+        ? { dangerouslySetInnerHTML: { __html: sanitizeRich(value ?? "") } }
+        : { children: value ?? "" })}
+    />
   );
 };
 
@@ -191,12 +244,23 @@ export const EditableImage = ({
 }: EditableImageProps): React.JSX.Element | null => {
   const editor = useEditor();
   const [open, setOpen] = useState(false);
+  const [wide, setWide] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  // The "remove image" button needs room, so small icons / thumbnails do not get it.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= 96 && entry.contentRect.height >= 64));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   if (!editor) {
     return value ? (
       <div className={className}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={value} alt={alt} className={imgClassName} />
+        <img src={value} alt={toPlain(alt)} className={imgClassName} />
       </div>
     ) : (
       <>{fallback}</>
@@ -204,10 +268,10 @@ export const EditableImage = ({
   }
 
   return (
-    <div className={cn("group/img relative", className)}>
+    <div ref={box} className={cn("group/img relative", className)}>
       {value ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={value} alt={alt} className={imgClassName} />
+        <img src={value} alt={toPlain(alt)} className={imgClassName} />
       ) : (
         <div className="grid h-full w-full place-items-center gap-1 overflow-hidden rounded-[inherit] border-2 border-dashed border-current/30 bg-black/5 p-1 text-center text-xs opacity-70">
           <ImageIcon className="size-5" />
@@ -223,6 +287,22 @@ export const EditableImage = ({
           <ImageIcon className="size-4" /> {value ? "Đổi ảnh" : emptyLabel}
         </span>
       </button>
+      {value && wide && (
+        <ConfirmDelete
+          title="Xoá ảnh?"
+          description="Ảnh sẽ được gỡ khỏi mục này (có thể thêm lại bằng URL)."
+          onConfirm={() => void editor.save(entity, id, { [field]: null })}
+        >
+          <button
+            type="button"
+            aria-label="Xoá ảnh"
+            title="Xoá ảnh"
+            className="absolute top-2 right-2 z-20 grid size-6 cursor-pointer place-items-center rounded-full bg-destructive text-white opacity-0 shadow transition-opacity group-hover/img:opacity-100"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </ConfirmDelete>
+      )}
       {open && (
         <ValueDialog
           title="Đổi hình ảnh"
@@ -252,7 +332,7 @@ export const EditableButton = ({
   if (!editor) {
     return (
       <a href={content.link ?? "#"} className={className}>
-        {content.title}
+        <RichText value={content.title} />
       </a>
     );
   }
@@ -284,28 +364,58 @@ export const EditableButton = ({
   );
 };
 
+// Only the innermost hovered item shows its delete button: CSS group-hover would also fire for every
+// ancestor item (a card containing bullets, socials, a logo…), so the active item is tracked explicitly.
+let activeItem: string | null = null;
+const itemListeners = new Set<() => void>();
+const setActiveItem = (id: string | null): void => {
+  if (activeItem === id) return;
+  activeItem = id;
+  itemListeners.forEach((l) => l());
+};
+const subscribeItem = (listener: () => void): (() => void) => {
+  itemListeners.add(listener);
+  return () => itemListeners.delete(listener);
+};
+
 /** Wraps a repeated item (card / content) with a hover delete control in edit mode. */
 export const ItemControls = ({
   entity,
   id,
   className,
+  inline = false,
   children,
 }: {
   entity: RemovableEntity;
   id: string;
   className?: string;
+  /** Put the delete button in the flow after the content (for tight rows) instead of floating over a corner. */
+  inline?: boolean;
   children: ReactNode;
 }): React.JSX.Element => {
   const editor = useEditor();
+  const uid = useId();
+  const active = useSyncExternalStore(subscribeItem, () => activeItem, () => null) === uid;
   if (!editor) return <div className={className}>{children}</div>;
   return (
-    <div className={cn("group/item relative", className)}>
+    <div
+      className={cn("relative", className)}
+      onMouseOver={(e) => {
+        e.stopPropagation();
+        setActiveItem(uid);
+      }}
+      onMouseLeave={() => activeItem === uid && setActiveItem(null)}
+    >
       {children}
       <ConfirmDelete onConfirm={() => void editor.remove(entity, id)}>
         <button
           type="button"
           aria-label="Xoá mục này"
-          className="absolute -top-2 -right-2 z-20 grid size-6 cursor-pointer place-items-center rounded-full bg-destructive text-white opacity-0 shadow transition-opacity group-hover/item:opacity-100"
+          className={cn(
+            "z-20 grid size-6 cursor-pointer place-items-center rounded-full bg-destructive text-white shadow transition-opacity",
+            active ? "opacity-100" : "pointer-events-none opacity-0",
+            inline ? "relative shrink-0" : "absolute -top-2 -right-2",
+          )}
         >
           <Trash2 className="size-3.5" />
         </button>

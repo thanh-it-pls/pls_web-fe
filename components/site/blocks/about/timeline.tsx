@@ -3,8 +3,8 @@ import { EditableImage, EditableText, ItemControls } from "@/components/site/edi
 import { cn } from "@/lib/utils";
 
 /** Vertical timeline; cards alternate text/image. card.img = building illustration. */
-export const TimelineBlock = ({ section }: BlockProps): React.JSX.Element => (
-  <section className="bg-[#fdeeee] py-14">
+export const AboutTimelineBlock = ({ section, bare }: BlockProps): React.JSX.Element => (
+  <section className={cn("py-14", !bare && "bg-[#fdeeee]")}>
     <Container>
       <SectionHeading section={section} />
       <div className="relative grid gap-10 @3xl:grid-cols-2 @3xl:gap-x-16 @3xl:before:absolute @3xl:before:inset-y-0 @3xl:before:left-1/2 @3xl:before:border-l-2 @3xl:before:border-dashed @3xl:before:border-[#c0272d]/40">

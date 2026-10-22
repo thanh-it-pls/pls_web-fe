@@ -1,9 +1,10 @@
+import { AddContents } from "@/components/site/add-content";
 import { Container, EmptyBlock, type BlockProps } from "@/components/site/blocks/common";
 import { EditableButton, EditableImage, EditableText } from "@/components/site/editor";
 import { ContentType } from "@/lib/api/types";
 
 /** One card: img = photo, title/subtitle = two-line heading, des = paragraph, BUTTON content = CTA. */
-export const StoryBlock = ({ section }: BlockProps): React.JSX.Element => {
+export const AboutStoryBlock = ({ section }: BlockProps): React.JSX.Element => {
   const card = section.cards[0];
   if (!card) return <EmptyBlock label="Chưa có card." />;
   const button = card.contents.find((c) => c.type === ContentType.BUTTON);
@@ -55,6 +56,7 @@ export const StoryBlock = ({ section }: BlockProps): React.JSX.Element => {
               content={button}
               className="inline-block rounded-full border border-[#c0272d] px-5 py-1.5 text-xs font-semibold text-[#c0272d]"
             />
+            {!button && <AddContents cardId={card.id} items={[{ type: 4, label: "Nút" }]} />}
           </div>
         </div>
       </Container>
