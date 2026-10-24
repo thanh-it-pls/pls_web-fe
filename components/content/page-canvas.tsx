@@ -201,6 +201,8 @@ export const PageCanvas = ({ pageId }: { pageId: string }): React.JSX.Element =>
           return settingShowsApi.create({ title: "Ứng tuyển ngay", link: "#", type: SettingType.BUTTON, code: genCode("button"), position: "HEADER" });
         case "header-social":
           return settingShowsApi.create({ title: "Mạng xã hội", type: SettingType.SOCIAL, code: genCode("social"), position: "HEADER" });
+        case "header-background":
+          return settingShowsApi.create({ title: "Nền header", type: SettingType.BACKGROUND, code: genCode("header-bg"), position: "HEADER" });
         case "copyright":
           return settingShowsApi.create({ title: "Copyright © PORO Language Space", type: SettingType.VERSION, code: genCode("version"), position: "FOOTER" });
         case "social":

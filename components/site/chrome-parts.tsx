@@ -15,7 +15,7 @@ export const SocialIcon = ({ item }: { item: SettingShow }): React.JSX.Element =
   <a
     href={item.link ?? "#"}
     title={item.title}
-    className="grid size-7 place-items-center overflow-hidden rounded-full bg-white/90 text-xs font-bold text-[#c0272d]"
+    className="grid size-10 place-items-center overflow-hidden rounded-full bg-white/90 text-xs font-bold text-[#c0272d]"
   >
     {item.img ? (
       // eslint-disable-next-line @next/next/no-img-element

@@ -103,7 +103,7 @@ const SettingDialog = ({
               </SelectTrigger>
               <SelectContent>
                 {(Object.keys(POSITION_LABEL) as SettingPosition[])
-                  .filter((p) => (p === "SECTION") === isBackgroundType(type))
+                  .filter((p) => (isBackgroundType(type) ? p !== "FOOTER" : p !== "SECTION"))
                   .map((p) => (
                   <SelectItem key={p} value={p}>
                     {POSITION_LABEL[p]}

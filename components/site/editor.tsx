@@ -20,7 +20,7 @@ export type ContentAddType = 1 | 3 | 4 | 5 | 6 | 8 | 9;
 
 /** Things the header / footer / blocks let you create in place. */
 export type SiteAdd =
-  | { kind: "logo" | "copyright" | "social" | "contact" | "header-logo" | "header-button" | "header-social" }
+  | { kind: "logo" | "copyright" | "social" | "contact" | "header-logo" | "header-button" | "header-social" | "header-background" }
   | { kind: "group"; groupType: 1 | 2 }
   | { kind: "item"; groupId: string; itemType: 1 | 2 | 3 | 4 | 5 }
   | {

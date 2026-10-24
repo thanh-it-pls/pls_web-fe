@@ -20,7 +20,7 @@ const NONE = "none";
 
 /** Setting-shows usable as a section background: BACKGROUND (image) and COLOR. */
 export const isBackgroundSetting = (s: SettingShow): boolean =>
-  s.type === SettingType.BACKGROUND || s.type === SettingType.COLOR;
+  (s.type === SettingType.BACKGROUND || s.type === SettingType.COLOR) && s.position !== "HEADER";
 
 /** Small preview of a background setting (colour fill or image). */
 export const BackgroundSwatch = ({
@@ -43,7 +43,7 @@ export const BackgroundSelect = ({
   onChange: (value: string) => void;
 }): React.JSX.Element => {
   const { data } = useResourceList(settingShowsApi, { domain: "setting-shows" }, { type: [SettingType.BACKGROUND, SettingType.COLOR] });
-  const options = data ?? [];
+  const options = (data ?? []).filter(isBackgroundSetting);
   const legacy = value && !options.some((o) => o.id === value);
   return (
     <Select value={value || NONE} onValueChange={(v) => onChange(v === NONE ? "" : v)}>
