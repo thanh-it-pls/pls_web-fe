@@ -125,9 +125,9 @@ jobs:
       - name: Verify public frontend and API
         run: |
           set -euo pipefail
-          curl --fail --show-error --silent --max-time 15 "$TESTING_URL/health"
-          curl --fail --show-error --silent --max-time 15 "$TESTING_URL/admin" >/dev/null
-          curl --fail --show-error --silent --max-time 15 "$TESTING_API_URL/health/ready"
+          curl --fail --show-error --silent --max-time 15 --retry 5 --retry-delay 5 --retry-all-errors "$TESTING_URL/health"
+          curl --fail --show-error --silent --max-time 15 --retry 5 --retry-delay 5 --retry-all-errors "$TESTING_URL/admin" >/dev/null
+          curl --fail --show-error --silent --max-time 15 --retry 5 --retry-delay 5 --retry-all-errors "$TESTING_API_URL/health/ready"
 
       - name: Tag deployed version
         env:
