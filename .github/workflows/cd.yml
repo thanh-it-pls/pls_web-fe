@@ -1,0 +1,142 @@
+name: Testing CD
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pls-web-frontend-testing
+  cancel-in-progress: true
+
+env:
+  WEB_DOMAIN: plstest.pls.edu.vn
+  TESTING_URL: https://plstest.pls.edu.vn
+  TESTING_API_URL: https://plstestapi.pls.edu.vn
+  DEPLOY_BASE_DIR: /root/pls_web_testing/frontend
+  BACKUP_DIR: /root/pls_web_testing/backups
+  APP_BLUE_HOST_PORT: "3050"
+  APP_GREEN_HOST_PORT: "3051"
+  COMPOSE_PROJECT_NAME: pls_web_testing_frontend
+  APP_IMAGE: pls-web-testing-frontend:${{ github.sha }}
+  CERT_DIR: /etc/nginx/ssl/pls.edu.vn
+
+jobs:
+  deploy:
+    if: github.repository == 'thanh-it-pls/pls_web-fe' && github.ref_name == 'dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: testing
+    permissions:
+      contents: write
+    env:
+      # Secrets không bắt buộc: thiếu thì dùng server testing 45.77.38.118, user root, cổng 22
+      SSH_HOST: ${{ secrets.TESTING_SSH_HOST || '45.77.38.118' }}
+      SSH_PORT: ${{ secrets.TESTING_SSH_PORT || '22' }}
+      SSH_USER: ${{ secrets.TESTING_SSH_USER || 'root' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          pattern='v[0-9]*.[0-9]*.[0-9]*'
+          latest="$(git tag --list "$pattern" --sort=-v:refname | head -n 1)"
+          if [ -z "$latest" ]; then
+            next="v1.0.0"
+          else
+            next="${latest%.*}.$(( ${latest##*.} + 1 ))"
+          fi
+          # commit đã có tag version (chạy lại workflow) thì dùng lại tag đó
+          existing="$(git tag --points-at HEAD --list "$pattern" --sort=-v:refname | head -n 1)"
+          if [ -n "$existing" ]; then
+            next="$existing"
+          fi
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+          echo "Version của lần build này: $next"
+
+      - name: Build testing image
+        run: |
+          set -euo pipefail
+          docker build --build-arg NEXT_PUBLIC_API_URL="$TESTING_API_URL" -t "$APP_IMAGE" .
+          docker save "$APP_IMAGE" | gzip -1 > "$RUNNER_TEMP/frontend-image.tar.gz"
+          ls -lh "$RUNNER_TEMP/frontend-image.tar.gz"
+
+      - name: Verify image
+        run: |
+          set -euo pipefail
+          docker run -d --name fe-verify -p 127.0.0.1:3999:3000 "$APP_IMAGE"
+          for i in $(seq 1 30); do
+            curl -fsS --max-time 5 http://127.0.0.1:3999/health && break
+            sleep 2
+          done
+          curl -fsS --max-time 5 http://127.0.0.1:3999/health
+          docker exec fe-verify sh -c "grep -R -q '$TESTING_API_URL' /app/.next"
+          docker rm -f fe-verify
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.TESTING_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/testing_deploy_key
+          chmod 600 ~/.ssh/testing_deploy_key
+          ssh-keygen -y -f ~/.ssh/testing_deploy_key >/dev/null
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Write server environment
+        run: |
+          set -euo pipefail
+          {
+            echo "APP_IMAGE=$APP_IMAGE"
+            echo "COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME"
+            echo "APP_BLUE_HOST_PORT=$APP_BLUE_HOST_PORT"
+            echo "APP_GREEN_HOST_PORT=$APP_GREEN_HOST_PORT"
+            echo "NEXT_PUBLIC_API_URL=$TESTING_API_URL"
+          } > /tmp/pls-web-frontend-testing.env
+
+      - name: Backup, upload image and deploy files
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/testing_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "mkdir -p '$DEPLOY_BASE_DIR' '$BACKUP_DIR'; if [ -f '$DEPLOY_BASE_DIR/docker-compose.testing.yml' ]; then tar -czf '$BACKUP_DIR/frontend-${GITHUB_SHA}.tar.gz' -C '$DEPLOY_BASE_DIR' .; fi"
+          rsync -az --delete --exclude='.env' --exclude='.deploy-state/' \
+            --include='/docker-compose.testing.yml' --include='/deploy/***' --include='/scripts/***' --exclude='*' \
+            -e "ssh -i ~/.ssh/testing_deploy_key -p $SSH_PORT" \
+            ./ "$SSH_USER@$SSH_HOST:$DEPLOY_BASE_DIR/"
+          scp -i ~/.ssh/testing_deploy_key -P "$SSH_PORT" /tmp/pls-web-frontend-testing.env \
+            "$SSH_USER@$SSH_HOST:$DEPLOY_BASE_DIR/.env"
+          ssh -i ~/.ssh/testing_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "gunzip -c | docker load" \
+            < "$RUNNER_TEMP/frontend-image.tar.gz"
+
+      - name: Deploy and verify on server
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/testing_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "chmod 600 '$DEPLOY_BASE_DIR/.env'; chmod +x '$DEPLOY_BASE_DIR/scripts/'*.sh; DEPLOY_BASE_DIR='$DEPLOY_BASE_DIR' WEB_DOMAIN='$WEB_DOMAIN' APP_BLUE_HOST_PORT='$APP_BLUE_HOST_PORT' APP_GREEN_HOST_PORT='$APP_GREEN_HOST_PORT' CERT_DIR='$CERT_DIR' bash '$DEPLOY_BASE_DIR/scripts/deploy_testing.sh'"
+
+      - name: Verify public frontend and API
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --max-time 15 "$TESTING_URL/health"
+          curl --fail --show-error --silent --max-time 15 "$TESTING_URL/admin" >/dev/null
+          curl --fail --show-error --silent --max-time 15 "$TESTING_API_URL/health/ready"
+
+      - name: Tag deployed version
+        env:
+          VERSION_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$VERSION_TAG" >/dev/null; then
+            echo "Tag $VERSION_TAG đã tồn tại, bỏ qua."
+            exit 0
+          fi
+          git tag "$VERSION_TAG" "$GITHUB_SHA"
+          git push origin "$VERSION_TAG"

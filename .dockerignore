@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+.next
+out
+.env
+.env.*
+!.env.example
+deploy
+scripts
+.deploy-state
+*.tsbuildinfo
+.DS_Store

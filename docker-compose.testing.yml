@@ -1,0 +1,28 @@
+name: ${COMPOSE_PROJECT_NAME:-pls_web_testing_frontend}
+
+# Testing stack trên server, dùng bởi scripts/deploy_testing.sh.
+# Image được build trên GitHub runner (cd.yml) rồi docker load lên server, nên server không phải build Next.js.
+# Blue/green: hai service giống nhau trên hai cổng host, mỗi lần chỉ chạy một; Nginx trỏ vào slot đang chạy.
+x-app-common: &app-common
+  image: ${APP_IMAGE:-pls-web-testing-frontend:local}
+  restart: unless-stopped
+  environment:
+    NODE_ENV: production
+    NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://plstestapi.pls.edu.vn}
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  app_blue:
+    <<: *app-common
+    profiles: ["bluegreen"]
+    container_name: pls-web-testing-frontend-blue
+    ports:
+      - "127.0.0.1:${APP_BLUE_HOST_PORT:-3050}:3000"
+
+  app_green:
+    <<: *app-common
+    profiles: ["bluegreen"]
+    container_name: pls-web-testing-frontend-green
+    ports:
+      - "127.0.0.1:${APP_GREEN_HOST_PORT:-3051}:3000"
